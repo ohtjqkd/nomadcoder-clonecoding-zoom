@@ -19,9 +19,25 @@ const httpServer = http.createServer(app);
 
 const wsServer = SocketIO(httpServer);
 
+function publicRooms() {
+    const {
+        sockets: {
+            adapter: { sids, rooms },
+        },
+    } = wsServer;
+    const publicRooms = [];
+    rooms.forEach((_, key) => {
+        if (sids.get(key) === undefined) {
+            publicRooms.push(key);
+        }
+    });
+    return publicRooms;
+}
+
 wsServer.on("connection", socket => {
     socket["nickname"] = socket.id
     socket.onAny((event) => {
+        console.log(wsServer.sockets.adapter);
         console.log(`Socket Event:${event}`);
     })
     socket.on("enter_room", (nickname, roomName, done) => {
@@ -29,10 +45,15 @@ wsServer.on("connection", socket => {
         socket["nickname"] = nickname;
         done(`Success join in ${roomName}`); // this is run on front
         socket.to(roomName).emit("welcome", socket.nickname);
+        wsServer.sockets.emit("room_change", publicRooms());
     });
     socket.on("disconnecting", () => {
         socket.rooms.forEach(room => socket.to(room).emit("bye", socket.nickname));
+        wsServer.sockets.emit("room_change", publicRooms());
     });
+    socket.on("disconnect", () => {
+        wsServer.sockets.emit("room_change", publicRooms());
+    })
     socket.on("new_message", (message, roomName, done) => {
         socket.to(roomName).emit("new_message", `${socket.nickname}: ${message}`);
         done()

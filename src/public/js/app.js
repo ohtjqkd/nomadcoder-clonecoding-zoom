@@ -28,8 +28,11 @@ function showRoom() {
 
 function showNicknameForm() {
     const nicknameForm = nickname.querySelector("form");
+    const input = nicknameForm.querySelector("input");
     nicknameForm.addEventListener("submit", handleNicknameSubmit);
     nickname.hidden = false;
+    console.log(input);
+    input.focus();
 }
 
 
@@ -54,7 +57,6 @@ function handleNicknameSubmit(event) {
     const input = nickForm.querySelector("input");
     socket.emit("enter_room", input.value, roomName, (res) => {
         console.log(res);
-
         nickForm.hidden = true;
     });
 }
@@ -80,6 +82,15 @@ socket.on("bye", (socket_id) => {
 })
 
 socket.on("new_message", addMessage);
+
+socket.on("room_change", (rooms) => {
+    const roomList = welcome.querySelector("ul");
+    rooms.forEach(room => {
+        const li = document.createElement("li");
+        li.innerText = room;
+        roomList.append(li);
+    })
+});
 // const messageList = document.querySelector("ul");
 // const nickForm = document.querySelector("#nick");
 // const messageForm = document.querySelector("#message");
