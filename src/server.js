@@ -2,7 +2,10 @@ import express from "express";
 import http from "http"
 import { PassThrough } from 'stream';
 import WebSocket from "ws";
-import SocketIO, { Socket } from "socket.io";
+// import SocketIO, { Socket } from "socket.io";
+import { instrument } from "@socket.io/admin-ui";
+import { Server } from "socket.io";
+
 const app = express();
 
 app.set("view engine", "pug");
@@ -17,7 +20,16 @@ console.log("hello");
 
 const httpServer = http.createServer(app);
 
-const wsServer = SocketIO(httpServer);
+const wsServer = new Server(httpServer, {
+    cors: {
+        origin: ["https://admin.socket.io"],
+        credentials: true,
+    },
+});
+
+instrument(wsServer, {
+    auth: false,
+});
 
 function publicRooms() {
     const {
@@ -40,12 +52,21 @@ wsServer.on("connection", socket => {
         console.log(wsServer.sockets.adapter);
         console.log(`Socket Event:${event}`);
     })
-    socket.on("enter_room", (nickname, roomName, done) => {
+    socket.on("join_room", (nickname, roomName, done) => {
         socket.join(roomName);
         socket["nickname"] = nickname;
         done(`Success join in ${roomName}`); // this is run on front
-        socket.to(roomName).emit("welcome", socket.nickname);
+        socket.to(roomName).emit("join_room", socket.nickname);
         wsServer.sockets.emit("room_change", publicRooms());
+    });
+    socket.on("offer", (offer, roomName) => {
+        socket.to(roomName).emit("offer", offer);
+    });
+    socket.on("answer", (answer, roomName) => {
+        socket.to(roomName).emit("answer", answer);
+    })
+    socket.on("ice", (ice, roomName) => {
+        socket.to(roomName).emit("ice", ice);
     });
     socket.on("disconnecting", () => {
         socket.rooms.forEach(room => socket.to(room).emit("bye", socket.nickname));
