@@ -19,6 +19,7 @@ call.hidden = true;
 
 let myStream;
 let myPeerConnection;
+let myDataChannel;
 let muted = false;
 let cameraOff = false;
 let roomName = "";
@@ -123,8 +124,20 @@ function showNicknameForm() {
     input.focus();
 }
 
-function makeConnection() {
-    myPeerConnection = new RTCPeerConnection();
+async function makeConnection() {
+    myPeerConnection = await new RTCPeerConnection({
+        iceservers: [
+            {
+                urls: [
+                    "stun:stun.l.google.com:19302",
+                    "stun:stun1.l.google.com:19302",
+                    "stun:stun2.l.google.com:19302",
+                    "stun:stun3.l.google.com:19302",
+                    "stun:stun4.l.google.com:19302",
+                ]
+            }
+        ]
+    });
     myPeerConnection.addEventListener("icecandidate", handleIce);
     myPeerConnection.addEventListener("addstream", handleAddStream);
     myStream.getTracks().forEach((track) => myPeerConnection.addTrack(track, myStream));
@@ -226,6 +239,8 @@ function changeCamera(event) {
 
 socket.on("join_room", async (socket_id) => {
     addMessage(`${socket_id} joined!`);
+    myDataChannel = await myPeerConnection.createDataChannel("chat");
+    myDataChannel.addEventListener("message", console.log);
     const offer = await myPeerConnection.createOffer();
     myPeerConnection.setLocalDescription(offer);
     console.log("create", offer);
@@ -234,6 +249,10 @@ socket.on("join_room", async (socket_id) => {
 
 socket.on("offer", async (offer) => {
     console.log("received the offer");
+    myPeerConnection.addEventListener("datachannel", (event) => {
+        myDataChannel = event.channel;
+        myDataChannel.addEventListener("message", console.log);
+    })
     myPeerConnection.setRemoteDescription(offer);
     const answer = await myPeerConnection.createAnswer();
     myPeerConnection.setLocalDescription(answer);
@@ -246,7 +265,7 @@ socket.on("answer", (answer) => {
     myPeerConnection.setRemoteDescription(answer);
 })
 
-socket.on("ice", (ice) => {
+socket.on("ice", async (ice) => {
     console.log("received candidate");
     myPeerConnection.addIceCandidate(ice);
 })
